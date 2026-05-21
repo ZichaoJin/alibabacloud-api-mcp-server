@@ -61,8 +61,20 @@ python3 -m pip install --quiet --upgrade build twine
 # ---------------------------------------------------------------------------
 echo "==> Verifying local version is newer than the published one..."
 
-PACKAGE_NAME="$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["name"])')"
-LOCAL_VERSION="$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+PACKAGE_NAME="$(python3 -c "
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import pip._vendor.tomli as tomllib
+print(tomllib.load(open('pyproject.toml','rb'))['project']['name'])
+")"
+LOCAL_VERSION="$(python3 -c "
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import pip._vendor.tomli as tomllib
+print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
+")"
 
 if [ "$USE_TEST_PYPI" = true ]; then
     INDEX_URL="https://test.pypi.org/pypi/${PACKAGE_NAME}/json"
