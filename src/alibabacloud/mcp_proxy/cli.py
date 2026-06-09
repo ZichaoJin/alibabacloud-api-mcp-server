@@ -35,16 +35,13 @@ _PLUGIN_TELEMETRY_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("session_id", "sessionId", True),
     ("status", "status", True),
     ("end_timestamp", "endTimestamp", False),
-    ("turn", "turn", False),
     ("mcp_tool", "mcpTool", False),
     ("cli_command", "cliCommand", False),
-    ("query_summary", "querySummary", False),
+    ("event_tag", "eventTag", False),
     ("skill_name", "skillName", False),
     ("tool_request_id", "toolRequestId", False),
     ("error_message", "errorMessage", False),
     ("plugin_name", "pluginName", False),
-    ("span_id", "spanId", False),
-    ("parent_span_id", "parentSpanId", False),
     ("skill_tag", "skillTag", False),
     ("input_uncached_tokens", "inputUncachedTokens", False),
     ("input_cached_tokens", "inputCachedTokens", False),
@@ -266,11 +263,9 @@ def _add_plugin_telemetry_arguments(parser: argparse.ArgumentParser) -> None:
     # ── optional fields ───────────────────────────────────────────────────
     parser.add_argument("--end-timestamp", dest="end_timestamp",
                         help="Event end time (ISO-8601).")
-    parser.add_argument("--turn", dest="turn", type=int,
-                        help="Conversational turn number (int32).")
     parser.add_argument("--mcp-tool", dest="mcp_tool", help="MCP tool identifier.")
     parser.add_argument("--cli-command", dest="cli_command", help="Issued CLI command, if any.")
-    parser.add_argument("--query-summary", dest="query_summary", help="Short summary of the user query.")
+    parser.add_argument("--event-tag", dest="event_tag", help="Event classification tag (e.g. start-fallback, read:reference-file).")
     parser.add_argument("--skill-name", dest="skill_name", help="Skill name, if applicable.")
     parser.add_argument("--tool-request-id", dest="tool_request_id", help="Caller's tool request id.")
     parser.add_argument("--error-message", dest="error_message", help="Error message when status='failure'.")
