@@ -42,6 +42,7 @@ _PLUGIN_TELEMETRY_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("tool_request_id", "toolRequestId", False),
     ("error_message", "errorMessage", False),
     ("plugin_name", "pluginName", False),
+    ("mcp_session_id", "mcpSessionId", False),
     ("input_uncached_tokens", "inputUncachedTokens", False),
     ("input_cached_tokens", "inputCachedTokens", False),
     ("input_creation_tokens", "inputCreationTokens", False),
@@ -269,6 +270,7 @@ def _add_plugin_telemetry_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tool-request-id", dest="tool_request_id", help="Caller's tool request id.")
     parser.add_argument("--error-message", dest="error_message", help="Error message when status='failure'.")
     parser.add_argument("--plugin-name", dest="plugin_name", help="Plugin name, e.g. 'alibabacloud'.")
+    parser.add_argument("--mcp-session-id", dest="mcp_session_id", help="MCP server session identifier.")
     parser.add_argument("--span-id", dest="span_id", help="Trace span identifier.")
     parser.add_argument("--parent-span-id", dest="parent_span_id", help="Parent trace span identifier.")
     parser.add_argument("--skill-tag", dest="skill_tag",
@@ -380,6 +382,65 @@ def _run_precheck_command(args: argparse.Namespace) -> int:
     return run_precheck(site_type, client_id=client_id)
 
 
+_AGENT_BINARIES = ("claude", "codex", "QoderWork")
+
+
+def _find_agent_pid() -> "int | None":
+    """Walk up the process tree to find the agent (claude/codex/QoderWork) PID."""
+    import subprocess as _sp
+
+    pid = os.getpid()
+    for _ in range(10):
+        try:
+            ppid = int(_sp.check_output(
+                ["ps", "-o", "ppid=", "-p", str(pid)],
+                text=True, stderr=_sp.DEVNULL,
+            ).strip())
+        except Exception:
+            break
+        if ppid <= 1:
+            break
+        try:
+            comm = _sp.check_output(
+                ["ps", "-o", "comm=", "-p", str(ppid)],
+                text=True, stderr=_sp.DEVNULL,
+            ).strip().rsplit("/", 1)[-1]
+        except Exception:
+            break
+        if comm in _AGENT_BINARIES:
+            return ppid
+        pid = ppid
+    return None
+
+
+def _write_mcp_session_marker() -> None:
+    """Write an mcpSessionId marker keyed by agent PID so hooks can correlate."""
+    import json as _json
+    import time as _time
+    import uuid as _uuid
+
+    agent_pid = _find_agent_pid()
+    if not agent_pid:
+        return
+    mcp_dir = os.path.expanduser(
+        "~/.cache/alibabacloud-agent-toolkit/mcp-sessions"
+    )
+    try:
+        os.makedirs(mcp_dir, exist_ok=True)
+        path = os.path.join(mcp_dir, f"{agent_pid}.json")
+        with open(path, "w") as f:
+            _json.dump({
+                "mcpSessionId": _uuid.uuid4().hex,
+                "pid": os.getpid(),
+                "agentPid": agent_pid,
+                "startTimestamp": _time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", _time.gmtime()
+                ),
+            }, f)
+    except Exception:
+        pass
+
+
 def _run_proxy_command(args: argparse.Namespace) -> int:
     """Execute the proxy (default) command."""
     try:
@@ -404,6 +465,8 @@ def _run_proxy_command(args: argparse.Namespace) -> int:
             log_path,
             config.site_type.value,
         )
+
+    _write_mcp_session_marker()
 
     try:
         anyio.run(run_proxy, config)
